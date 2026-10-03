@@ -138,7 +138,7 @@ sequenceDiagram
     Worker->>DB: Read committed outbox work
     Worker->>Providers: Create event / send due permitted message
     Providers-->>Worker: Accepted request and provider identifiers
-    Worker->>DB: Record status; reconcile delivery callbacks
+    Worker->>DB: Record status, reconcile delivery callbacks
     Patient->>UI: Open prescriptions
     UI->>API: Fetch authorized released prescriptions
     API-->>UI: Signed prescription and follow-up details
@@ -169,7 +169,7 @@ sequenceDiagram
         API->>API: Decrypt, validate, deduplicate and preserve provenance
         API->>DB: Store permitted records and access policy
     else Consent denied or expired
-        API->>DB: Store consent status; no record fetch
+        API->>DB: Store consent status, no record fetch
     end
     Patient->>CM: Revoke consent
     CM-->>API: Authenticated revocation notification
