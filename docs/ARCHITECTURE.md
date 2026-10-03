@@ -1,25 +1,11 @@
-# ALOCC architecture and ideal backend flow
+# ALOCC architecture and backend flow
 
 ## Design status
 
-This document proposes the complete ALOCC system. The published GitHub Pages website currently implements the browser experience only. Boxes labelled as backend services or integrations below describe future implementation, not live capabilities.
+This document proposes the complete ALOCC system. 
 
-The original development workspace includes a FastAPI/SQLite prototype with server-side patient access checks, consultation drafts, prescription validation, consent records, matching logic, and an activity log. Its Claude extraction path is implemented; ABDM, WhatsApp, and Google Calendar real adapters remain unimplemented. It is a useful starting point, but not a production backend.
 
-## Current published architecture
-
-```mermaid
-flowchart LR
-    User[Clinician / Patient / Administrator] --> Pages[GitHub Pages]
-    Pages --> UI[index.html: views and actions]
-    UI --> Store[care-store.js: localApi]
-    Store <--> Local[Browser localStorage]
-    Store --> Samples[Illustrative records and catalogues]
-```
-
-There are no live service calls or server-side trust boundaries in this version. Browser profile selection must never be reused as production authentication.
-
-## Proposed complete architecture
+## Complete architecture
 
 Start with a modular FastAPI backend and a separate background-worker process. Separate modules by responsibility without requiring a microservice deployment for each module.
 
