@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALOCC-ABHA Linked Oncology Care Copilot</title>
+<style>
+:root{--ink:#12263a;--muted:#4a5d6c;--teal:#137c86;--tint:#e3f1f2;--line:#d3dde3;--amber:#8a5a00;--amberbg:#fbf1dc;--bg:#fafbfc;--red:#b3261e}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,sans-serif;color:var(--ink);background:var(--bg)}
+.banner{background:var(--amberbg);color:var(--amber);text-align:center;padding:6px;font-size:13px}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0;color:var(--teal)}h2{font-size:17px;margin:18px 0 8px}h3{font-size:15px;margin:12px 0 6px;color:var(--teal)}
+.wrap{display:flex;min-height:80vh}.side{width:220px;border-right:1px solid var(--line);padding:12px}.main{flex:1;padding:16px 22px;max-width:1000px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--teal);margin-bottom:12px}
+.tab{padding:7px 12px;cursor:pointer;background:var(--tint);border:0;font:inherit}.tab.on{background:var(--teal);color:#fff}
+button,.btn{font:inherit;background:var(--teal);color:#fff;border:0;padding:6px 12px;cursor:pointer;border-radius:3px}
+button.alt{background:var(--tint);color:var(--ink);border:1px solid var(--line)}button.red{background:var(--red)}
+input,select,textarea{font:inherit;padding:6px;border:1px solid var(--line);border-radius:3px;max-width:100%}textarea{width:100%;min-height:110px}
+input.u{border-color:var(--amber);background:var(--amberbg)}
+table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}th{background:var(--tint)}
+.card{border:1px solid var(--line);background:#fff;padding:10px 14px;margin:8px 0;border-radius:4px}.warn{background:var(--amberbg);color:var(--amber);padding:8px 12px;margin:8px 0}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;background:var(--tint);font-size:12px}.muted{color:var(--muted);font-size:13px}
+.pt{display:block;width:100%;text-align:left;margin:4px 0}.pt.on{outline:2px solid var(--ink)}
+.login{max-width:380px;margin:40px auto;padding:20px}.login input{width:100%;margin:6px 0}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media(max-width:700px){.wrap{flex-direction:column}.side{width:100%;border-right:0;border-bottom:1px solid var(--line)}}
+
+body{background:linear-gradient(135deg,#edf6f6,#f8fafc 60%)}.banner{background:#103d46;color:#d9eff0;padding:9px}header{background:#fff;padding:18px 28px;gap:20px;flex-wrap:wrap}header h1{max-width:520px}.main{max-width:none;padding:24px 32px}.side{background:#f0f6f7;width:250px;padding:24px 16px}.card{border-radius:14px;padding:20px;box-shadow:0 3px 12px #12303b08}.login{max-width:520px;margin:48px auto;padding:36px}.login h1{font-size:28px;line-height:1.25;color:#123d46}.login select{width:100%;margin:10px 0 18px;padding:12px}.enter{width:100%;padding:13px;font-weight:600}.brandmark{display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:16px;background:#137c86;color:white;font-size:34px;font-weight:700;margin-bottom:24px}.brandmark span{font-size:20px;margin-top:-16px}.eyebrow{font-size:11px;letter-spacing:2px;color:#137c86;font-weight:700}.footnote{text-align:center;margin-bottom:0}button{border-radius:8px;transition:background .15s}button:hover{filter:brightness(.93)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #50bac4;outline-offset:3px}.tabs{gap:8px;padding-bottom:10px;border-color:#d3dde3}.tab{border-radius:8px}.pt{padding:12px;margin:10px 0}h2{font-size:22px}input,textarea,select{border-radius:7px}td,th{padding:10px}.main{overflow-x:auto}.wrap{min-height:calc(100vh - 125px)}.warn{border-radius:9px}textarea{min-height:140px}@media(max-width:700px){.login{margin:24px 16px;padding:24px}.main{padding:18px 14px}.side{width:100%;padding:12px}.side .pt{display:inline-block;width:auto;margin:4px}.login h1{font-size:24px}header{padding:16px}table{font-size:13px}.tabs{gap:4px}.tab{padding:8px}}
+</style></head><body>
+<div class="banner">ABHA-linked care · Patient-controlled consent · Clinician-reviewed prescriptions</div>
+<div id="app"></div>
+<script src="./care-store.js"></script>
+<script>
+const S={token:null,role:null,name:null,pid:null,pts:[],tab:null,draft:null,cid:null};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const api=(path,method='GET',body={})=>localApi(path,method,body);
+const run=async f=>{try{await f()}catch(e){alert(e.message)}};
+const tbl=(h,rows)=>`<table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+const rs=n=>'\u20B9'+Number(n).toLocaleString('en-IN');
+
+/* ---------- login ---------- */
+function loginView(){
+  $('#app').innerHTML=`<div class="login card"><div class="brandmark">A<span>+</span></div><p class="eyebrow">CONNECTED ONCOLOGY CARE</p><h1>ALOCC-ABHA Linked Oncology Care Copilot</h1><p class="muted">One care journey. Every record, prescription and follow-up in one place.</p><h3>Choose your workspace</h3><label for="u">Care profile</label><select id="u"><optgroup label="Clinicians"><option value="dr.rao">Dr. Rao · Oncology</option><option value="dr.mehta">Dr. Mehta · Oncology</option></optgroup><optgroup label="Patients"><option value="asha">Asha Verma</option><option value="ravi">Ravi Kumar</option><option value="meera">Meera Nair</option></optgroup><option value="admin">Administrator</option></select><button class="enter" onclick="doLogin()">Open care workspace →</button><p class="muted footnote">Illustrative patient records · Changes saved in this browser</p></div>`;
+}
+function doLogin(){run(async()=>{
+  const j=await localApi('/login','POST',{username:$('#u').value});
+  Object.assign(S,{token:j.token,role:j.role,name:j.name,pid:j.patient_id,draft:null,cid:null});
+  if(S.role!=='admin'){S.pts=await api('/patients');S.pid=S.role==='patient'?j.patient_id:S.pts[0]?.id}
+  S.tab=TABS[S.role][0][0];shell();
+})}
+function logout(){S.token=null;loginView()}
+
+/* ---------- shell ---------- */
+const TABS={
+ doctor:[['records','Records & consent'],['consult','Consultation'],['follow','Follow-ups'],['labs','Lab panels'],['alerts','Alerts']],
+ patient:[['timeline','My records'],['rx','Prescription & prices'],['appt','Appointments & messages'],['consents','Consents'],['orders','Lab referrals']],
+ admin:[['adm','Labs & panels'],['audit','Audit log']]};
+function shell(){
+  const side=S.role==='doctor'?`<div class="side"><b>Patients</b>${S.pts.map(p=>`<button class="pt alt ${p.id===S.pid?'on':''}" onclick="S.pid=${p.id};S.draft=null;S.cid=null;shell()">${esc(p.name)}<br><span class="muted">${esc(p.cancer)} · ${p.abha?'ABHA linked':'no ABHA'}</span></button>`).join('')}</div>`:'';
+  $('#app').innerHTML=`<header><h1>ALOCC-ABHA Linked Oncology Care Copilot</h1><span>${esc(S.name)} <span class="pill">${S.role}</span> <button class="alt" onclick="logout()">Switch workspace</button></span></header>
+  <div class="wrap">${side}<div class="main"><div class="tabs">${TABS[S.role].map(([k,l])=>`<button class="tab ${k===S.tab?'on':''}" onclick="S.tab='${k}';shell()">${l}</button>`).join('')}</div><div id="view">Loading...</div></div></div>`;
+  run(async()=>{$('#view').innerHTML=await VIEWS[S.tab]()});
+}
+const reload=()=>run(async()=>{$('#view').innerHTML=await VIEWS[S.tab]()});
+
+/* ---------- shared pieces ---------- */
+function sum(r){const d=r.data||{};let s=[];
+  if(d.histology)s.push(esc(d.histology)+(d.stage?', stage '+esc(d.stage):''));
+  if(d.biomarkers)s.push('Biomarkers: '+Object.entries(d.biomarkers).map(([k,v])=>esc(k)+' '+esc(v)).join(', '));
+  if(d.medicines)s.push('Medicines: '+esc(d.medicines.join('; ')));
+  if(d.summary)s.push(esc(d.summary));if(d.impression)s.push(esc(d.impression));return s.join('<br>')}
+async function timelineHtml(pid){
+  const rows=await api(`/patients/${pid}/timeline`);
+  return rows.length?tbl(['Date','Type','Title','Details','Source'],rows.map(r=>[r.date,r.type,esc(r.title),sum(r),`<span class="pill">${r.source}</span>`])):'<p class="muted">No records yet. Records from other hospitals appear after the patient approves a consent request.</p>';
+}
+async function pricesHtml(cid){
+  const list=await api(`/consultations/${cid}/prices`);
+  return list.map(m=>!m.found?`<div class="card">${esc(m.generic)}: ${esc(m.message)}</div>`:
+   `<div class="card"><b>${esc(m.generic)} ${m.strength_mg} mg</b> <span class="muted">(${m.units} units for the full course; illustrative prices)</span>
+    ${tbl(['Provider','Product','Per unit','Course total','Delivery','Stock'],m.offers.map((o,i)=>[esc(o.provider)+(i===0&&o.available?' <span class="pill">cheapest</span>':''),esc(o.product),rs(o.unit_price),'<b>'+rs(o.total)+'</b>',o.delivery_days+' days',o.available?'In stock':'Out of stock']))}
+    <div class="muted">Source: ${esc(m.offers[0].source)}, fetched ${esc(m.offers[0].fetched_at)}</div>
+    <h3>Same-molecule alternatives <span class="muted">(Discuss with your doctor; never swapped automatically)</span></h3>
+    ${tbl(['Product','Best course total','Saving'],m.alternatives.map(a=>[esc(a.product),rs(a.best_total),'<b>'+rs(a.saving)+'</b>']))}</div>`).join('')||'<p class="muted">No medicines on this prescription.</p>';
+}
+async function showPrices(cid,el){run(async()=>{$('#'+el).innerHTML=await pricesHtml(cid)})}
+async function openRx(cid){const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to view the prescription.');run(async()=>{const h=await api(`/consultations/${cid}/prescription.html`);w.document.write(h);w.document.close()})}
+async function rxList(pid){
+  const rows=await api(`/patients/${pid}/prescriptions`);
+  return rows.map(r=>`<div class="card"><b>Prescription #${r.id}</b> by ${esc(r.doctor)} <span class="muted">${esc(r.signed_at)}</span>
+   <div>${r.note.medicines.map(m=>`${esc(m.generic)} ${m.strength_mg} mg, ${m.freq_per_day}/day for ${m.duration_days} days`).join('<br>')||'No medicines'}</div>
+   <div class="muted">Tests: ${esc(r.note.tests.join(', ')||'-')} · Follow-up: ${esc(r.note.followup_date||'-')}</div>
+   <div class="row"><button class="alt" onclick="openRx(${r.id})">View / print</button><button onclick="showPrices(${r.id},'pr${r.id}')">Compare medicine prices</button></div><div id="pr${r.id}"></div></div>`).join('')||'<p class="muted">No signed prescriptions yet.</p>';
+}
+async function apptHtml(pid,doctor){
+  const [a,m]=await Promise.all([api(`/patients/${pid}/appointments`),api(`/patients/${pid}/messages`)]);
+  return `<h2>Appointments</h2>`+(a.length?tbl(['Date','Status','Calendar event',''],a.map(x=>[x.date,x.status,esc(x.gcal_id),doctor&&x.status!=='cancelled'?`<button class="alt" onclick="resched(${x.id})">Reschedule</button> <button class="red" onclick="cancelAppt(${x.id})">Cancel</button>`:''])):'<p class="muted">None scheduled.</p>')+
+   `<h2>WhatsApp follow-up messages</h2><p class="muted">Messages never include diagnosis or drug names.</p>`+
+   (m.length?tbl(['Direction','Kind','Scheduled for','Status','Text'],m.map(x=>[x.direction==='in'?'from patient':'to patient',x.kind,x.scheduled_for,x.status,esc(x.body)])):'<p class="muted">No messages.</p>');
+}
+const resched=id=>{const d=prompt('New date (YYYY-MM-DD)');if(d)run(async()=>{await api(`/appointments/${id}/reschedule`,'POST',{date:d});reload()})};
+const cancelAppt=id=>run(async()=>{await api(`/appointments/${id}/cancel`,'POST');reload()});
+async function ordersHtml(pid,doctor){
+  const o=await api(`/patients/${pid}/orders`);
+  return o.length?tbl(['Order','Lab','Panel','Genes','Status','Summary',''],o.map(x=>[x.id,esc(x.lab),esc(x.panel),esc(x.genes),x.status,esc(x.summary),doctor&&x.status==='ordered'?`<button class="alt" onclick="enterResults(${x.id})">Enter results</button>`:''])):'<p class="muted">No lab orders.</p>';
+}
+const enterResults=id=>{const t=prompt('Results as GENE=result, comma separated (e.g. BRCA1=negative,PIK3CA=mutated)');if(!t)return;
+  const r={};t.split(',').forEach(p=>{const [k,v]=p.split('=');if(k&&v)r[k.trim().toUpperCase()]=v.trim()});
+  run(async()=>{await api(`/orders/${id}/report`,'POST',{results:r});reload()})};
+
+/* ---------- views ---------- */
+const VIEWS={
+ async records(){
+  const p=await api(`/patients/${S.pid}`);
+  const con=p.consents.filter(c=>c.kind==='abdm_data');
+  return `<h2>${esc(p.name)}, ${p.age} <span class="pill">${esc(p.cancer)}</span></h2>
+  <div class="card"><b>ABHA:</b> ${p.abha?esc(p.abha):`<span class="muted">not linked</span> <input id="abha" placeholder="91-1000-2000-3003"> <button onclick="linkAbha()">Verify and link</button>`}</div>
+  <h3>ABDM record consent</h3>${con.length?tbl(['Purpose','Status','Valid until'],con.map(c=>[esc(c.purpose),`<span class="pill">${c.status}</span>`,c.valid_until||''])):'<p class="muted">No requests yet.</p>'}
+  ${p.abha?`<button onclick="reqConsent()">Request prior records (consent)</button> <span class="muted">The patient approves under Consents on their login.</span>`:''}
+  <h3>Timeline</h3>${await timelineHtml(S.pid)}`;
+ },
+ async consult(){
+  const sel=await api(`/patients/${S.pid}/prescriptions`);
+  const d=S.draft;
+  return `<h2>Consultation</h2><div class="row"><label><input type="checkbox" id="aud"> Patient consents to audio recording</label> <button class="alt" onclick="mic()">Dictate (browser mic)</button></div>
+  <textarea id="tr" placeholder="Paste or dictate the consultation transcript (English or Hinglish)...">${d?esc(d.transcript):'Breast cancer stage II. ER positive. Start letrozole 2.5 mg once daily for 30 days. Order NGS panel. Follow up after 2 weeks.'}</textarea>
+  <button onclick="makeDraft()">Create structured draft</button>
+  ${d?draftForm(d.draft):''}
+  <h3>Signed prescriptions</h3>${await rxList(S.pid)}`;
+ },
+ async follow(){return `<div class="row"><button onclick="runDue(0)">Send due reminders now</button><button class="alt" onclick="runDue(3)">Simulate +3 days</button><button class="alt" onclick="runDue(14)">Simulate +14 days</button></div>`+await apptHtml(S.pid,true)},
+ async labs(){
+  return `<h2>Genomic panel matching</h2><div class="warn">Biomarker tables and lab panels require clinician validation. The system suggests; the doctor decides.</div>
+  <div class="row">Sample type <select id="smp"><option value="">any</option><option>tissue</option><option>blood</option></select><button onclick="matchLabs()">Compute testing gap and rank panels</button></div><div id="mres"></div>
+  <h3>Orders</h3>${await ordersHtml(S.pid,true)}`;
+ },
+ async alerts(){
+  const a=await api('/alerts');
+  return `<h2>Patient alerts</h2>`+(a.length?tbl(['When','Patient','Message',''],a.map(x=>[esc(x.created),esc(x.patient_name),esc(x.text),`<button class="alt" onclick="resolveAlert(${x.id})">Resolve</button>`])):'<p class="muted">No open alerts.</p>');
+ },
+ async timeline(){return '<h2>My records</h2>'+await timelineHtml(S.pid)},
+ async rx(){return '<h2>My prescriptions</h2>'+await rxList(S.pid)},
+ async appt(){
+  const html=await apptHtml(S.pid,false);
+  return html+`<h3>Reply to a check-in</h3><div class="row"><button class="alt" onclick="sendReply('1')">1 Fine</button><button class="alt" onclick="sendReply('2')">2 Some problems</button><button class="red" onclick="sendReply('3')">3 Need help</button><input id="rt" placeholder="or type a message"><button onclick="sendReply($('#rt').value)">Send</button></div>`;
+ },
+ async consents(){
+  const p=await api(`/patients/${S.pid}`);
+  return `<h2>Consents</h2>`+(p.consents.length?tbl(['Kind','Purpose','Status','Valid until',''],p.consents.map(c=>[c.kind,esc(c.purpose),`<span class="pill">${c.status}</span>`,c.valid_until||'',
+   c.kind==='abdm_data'&&c.status==='REQUESTED'?`<button onclick="decide(${c.id},'approve')">Approve</button> <button class="alt" onclick="decide(${c.id},'deny')">Deny</button>`:
+   c.kind==='abdm_data'&&c.status==='GRANTED'?`<button class="red" onclick="decide(${c.id},'revoke')">Revoke (deletes fetched copies)</button>`:''])):'<p class="muted">None.</p>')+
+   `<h3>WhatsApp reminders</h3><div class="row"><button onclick="optin(true)">Opt in</button><button class="alt" onclick="optin(false)">Opt out</button></div>`;
+ },
+ async orders(){return '<h2>Lab referrals</h2>'+await ordersHtml(S.pid,false)},
+ async adm(){
+  const d=await api('/admin/data');
+  return `<div class="warn">Panel configuration requires clinician validation.</div><h2>Panels</h2>`+tbl(['Lab','Panel','Sample','Price','Genes'],d.panels.map(p=>[esc(p.lab),esc(p.name),p.sample,rs(p.price),esc(p.genes)]))+
+  `<h3>Add panel</h3><div class="row"><select id="al">${d.labs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select><input id="an" placeholder="Panel name"><input id="ap" type="number" placeholder="Price"><input id="ag" placeholder="GENE1,GENE2"><select id="as"><option>tissue</option><option>blood</option></select><button onclick="addPanel()">Add</button></div>
+  <h2>Cancer to biomarker table</h2>`+tbl(['Cancer','Gene'],d.biomarkers.map(b=>[esc(b.cancer),esc(b.gene)]))+
+  `<div class="row"><input id="bc" placeholder="cancer (e.g. breast)"><input id="bg" placeholder="gene"><button onclick="addBio()">Add</button></div>`;
+ },
+ async audit(){const a=await api('/admin/audit');return '<h2>Audit log</h2><p class="muted">Who did what and when; no clinical values are logged.</p>'+tbl(['Time','User','Action','Patient'],a.map(x=>[x.ts,esc(x.user),esc(x.action),x.patient_id??'']))}
+};
+
+/* ---------- actions ---------- */
+const linkAbha=()=>run(async()=>{await api(`/patients/${S.pid}/abha`,'POST',{abha:$('#abha').value.trim()});S.pts=await api('/patients');shell()});
+const reqConsent=()=>run(async()=>{await api(`/patients/${S.pid}/consents`,'POST',{});reload()});
+const decide=(id,a)=>run(async()=>{await api(`/consents/${id}/decision`,'POST',{action:a});reload()});
+const optin=v=>run(async()=>{await api(`/patients/${S.pid}/whatsapp`,'POST',{optin:v});alert(v?'Opted in to WhatsApp reminders':'Opted out; scheduled reminders cancelled');reload()});
+const sendReply=t=>{if(!t)return;run(async()=>{const r=await api(`/patients/${S.pid}/reply`,'POST',{text:t});alert(r.urgent?'Your care team has been alerted.':'Thanks, noted.');reload()})};
+const resolveAlert=id=>run(async()=>{await api(`/alerts/${id}/resolve`,'POST');reload()});
+const runDue=n=>run(async()=>{const r=await api('/messages/run-due','POST',{advance_days:n});alert(r.sent+' message(s) updated');reload()});
+function mic(){const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return alert('Speech recognition is not available in this browser. Paste the transcript instead.');
+  if(!$('#aud').checked)return alert('Tick the patient consent box before recording.');
+  const r=new R();r.lang='en-IN';r.continuous=true;r.onresult=e=>{$('#tr').value+=' '+e.results[e.results.length-1][0].transcript};r.start();S.rec=r;alert('Listening... click Create structured draft when done.')}
+const makeDraft=()=>run(async()=>{
+  const wasAudio=!!S.rec;if(S.rec){S.rec.stop();S.rec=null}
+  const t=$('#tr').value,au=$('#aud').checked;
+  const r=await api('/consultations','POST',{patient_id:S.pid,transcript:t,source:wasAudio?'audio':'text',audio_consent:au});
+  S.cid=r.id;S.draft={transcript:t,draft:r.draft};reload()});
+function matchLabs(){run(async()=>{
+  const r=await api(`/labs/match?patient_id=${S.pid}&sample=${$('#smp').value}`);
+  $('#mres').innerHTML=`<div class="card"><b>Cancer:</b> ${esc(r.cancer)}<br><b>Recommended biomarkers:</b> ${r.recommended.map(esc).join(', ')}<br><b>Already tested:</b> ${r.tested.map(esc).join(', ')||'none on record'}<br><b>Testing gap:</b> ${r.gap.map(esc).join(', ')||'none'}</div>`+
+   (r.ranked.length?tbl(['Rank','Lab','Panel','Coverage','Reasoning','Sample','Price','Turnaround',''],r.ranked.map((p,i)=>[i+1,esc(p.lab)+'<br><span class="muted">'+esc(p.city)+' · '+esc(p.accreditation)+'</span>',esc(p.name),p.coverage_pct+'%',esc(p.reasoning),p.sample,rs(p.price),p.tat_days+' days',`<button onclick="orderPanel(${p.id})">Order</button>`])):'<p class="muted">No panel matches.</p>')+`<div class="muted">${esc(r.disclaimer)}</div>`})}
+const orderPanel=id=>{if(confirm('Create lab order for this panel?'))run(async()=>{await api('/orders','POST',{patient_id:S.pid,panel_id:id});alert('Order created; visible to the patient.');S.tab='labs';shell()})};
+const addPanel=()=>run(async()=>{await api('/admin/panels','POST',{lab_id:+$('#al').value,name:$('#an').value,price:+$('#ap').value,genes:$('#ag').value,sample:$('#as').value});reload()});
+const addBio=()=>run(async()=>{await api('/admin/biomarkers','POST',{cancer:$('#bc').value,gene:$('#bg').value});reload()});
+
+/* ---------- draft form (doctor reviews, edits and signs) ---------- */
+function draftForm(d){
+  const U=p=>d.fields_uncertain.includes(p)?'u':'';
+  const v=x=>x==null?'':esc(x);
+  const meds=d.medicines.length?d.medicines:[];
+  return `<div class="card"><h3>Draft note <span class="muted">(source: ${d.source}; amber fields are uncertain and need your check)</span></h3>
+  <p>Complaints<br><textarea id="f_comp" style="min-height:50px">${v(d.complaints)}</textarea></p>
+  <div class="row">Cancer <input id="f_ct" class="${U('diagnosis.cancer_type')}" value="${v(d.diagnosis.cancer_type)}">
+  Histology <input id="f_hi" value="${v(d.diagnosis.histology)}"> Stage <input id="f_st" size="5" class="${U('diagnosis.stage')}" value="${v(d.diagnosis.stage)}"></div>
+  <p>Biomarkers already tested (GENE=result, comma separated)<br><input id="f_bm" size="60" value="${Object.entries(d.biomarkers).map(([k,x])=>k+'='+x).join(', ')}"></p>
+  <h3>Medicines</h3><table id="meds"><tr><th>Generic</th><th>Strength (mg)</th><th>Per day</th><th>Days</th><th>Route</th></tr>
+  ${meds.map((m,i)=>`<tr><td><input class="g" value="${v(m.generic)}"></td><td><input class="s ${U(`medicines.${i}.strength_mg`)}" size="6" value="${v(m.strength_mg)}"></td><td><input class="f ${U(`medicines.${i}.freq_per_day`)}" size="4" value="${v(m.freq_per_day)}"></td><td><input class="d ${U(`medicines.${i}.duration_days`)}" size="4" value="${v(m.duration_days)}"></td><td><input class="r" size="8" value="${v(m.route||'oral')}"></td></tr>`).join('')}</table>
+  <button class="alt" onclick="addMedRow()">+ Medicine</button>
+  <p>Tests ordered (comma separated)<br><input id="f_te" size="50" value="${(d.tests||[]).join(', ')}"></p>
+  <p>Advice<br><input id="f_ad" size="70" value="${v(d.advice)}"></p>
+  <div class="row">Follow-up date <input id="f_fd" type="date" class="${U('followup_date')}" value="${v(d.followup_date)}"> <span class="muted">${v(d.followup_text)}</span></div>
+  <p><button onclick="signNote()">Review done: sign and release to patient</button></p></div>`;
+}
+const addMedRow=()=>{$('#meds').insertAdjacentHTML('beforeend','<tr><td><input class="g"></td><td><input class="s" size="6"></td><td><input class="f" size="4"></td><td><input class="d" size="4"></td><td><input class="r" size="8" value="oral"></td></tr>')};
+const num=x=>x===''||x==null?null:Number(x);
+function signNote(){run(async()=>{
+  const rows=[...document.querySelectorAll('#meds tr')].slice(1);
+  const bm={};$('#f_bm').value.split(',').forEach(p=>{const [k,x]=p.split('=');if(k&&x)bm[k.trim().toUpperCase()]=x.trim()});
+  const note={complaints:$('#f_comp').value,diagnosis:{cancer_type:$('#f_ct').value||null,histology:$('#f_hi').value||null,stage:$('#f_st').value||null},biomarkers:bm,
+    medicines:rows.filter(r=>r.querySelector('.g').value.trim()).map(r=>({generic:r.querySelector('.g').value.trim(),strength_mg:num(r.querySelector('.s').value),freq_per_day:num(r.querySelector('.f').value),duration_days:num(r.querySelector('.d').value),route:r.querySelector('.r').value||'oral'})),
+    tests:$('#f_te').value.split(',').map(x=>x.trim()).filter(Boolean),advice:$('#f_ad').value,followup_date:$('#f_fd').value||null,followup_text:S.draft.draft.followup_text||''};
+  await api(`/consultations/${S.cid}/sign`,'POST',note);S.draft=null;S.cid=null;alert('Signed. The patient can now see the prescription; follow-up and reminders are scheduled.');reload()})}
+loginView();
+</script></body></html>
